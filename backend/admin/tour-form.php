@@ -25,7 +25,7 @@ admin_header($isEditing ? 'Edit Tour' : 'Add Tour', 'tours');
         <input id="tourMainImageInput" class="hidden" name="image" type="file" accept="image/*" onchange="setTourMainImageName(this)">
         <span id="tourMainImageFileName" class="text-xs font-normal text-slate-500">No image selected</span>
       </label>
-      <button class="secondary" type="submit"><i class="fa-solid fa-upload mr-2"></i>Upload Image</button>
+      <button id="tourImageUploadButton" class="secondary" type="submit"><i class="fa-solid fa-upload"></i><span>Upload Image</span></button>
     </form>
 
     <form id="tourForm" class="grid gap-4">
@@ -33,16 +33,34 @@ admin_header($isEditing ? 'Edit Tour' : 'Add Tour', 'tours');
       <div class="grid gap-4 lg:grid-cols-2">
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Name <input class="form-control" name="name" required></label>
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Slug <input class="form-control" name="slug"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Category <input class="form-control" name="category"></label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Category
+          <select class="form-control" name="category">
+            <option value="Activities">Activities</option>
+            <option value="Beach">Beach</option>
+            <option value="Culture">Culture</option>
+            <option value="Nature">Nature</option>
+            <option value="Tours">Tours</option>
+            <option value="Hotels">Hotels</option>
+            <option value="Food">Food</option>
+            <option value="Unique">Unique</option>
+          </select>
+        </label>
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Location <input class="form-control" name="location"></label>
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Duration <input class="form-control" name="duration"></label>
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Group Size <input class="form-control" name="group_size"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Price <input class="form-control" name="price" type="number" step="0.01"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Currency <input class="form-control" name="currency" value="USD"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Rating <input class="form-control" name="rating" type="number" step="0.1"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Reviews <input class="form-control" name="review_count" type="number"></label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Currency
+          <select class="form-control" name="currency">
+            <option value="USD">USD</option>
+            <option value="TZS">TZS</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+          </select>
+        </label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Price <input class="form-control" name="price" type="number" min="0" step="0.01"></label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Rating (0–5) <input class="form-control" name="rating" type="number" min="0" max="5" step="0.1"></label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Reviews <input class="form-control" name="review_count" type="number" min="0" step="1"></label>
         <label class="grid gap-1.5 text-sm font-medium text-slate-700">Difficulty <input class="form-control" name="difficulty"></label>
-        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Display Order <input class="form-control" name="display_order" type="number"></label>
+        <label class="grid gap-1.5 text-sm font-medium text-slate-700">Display Order <input class="form-control" name="display_order" type="number" min="0" step="1"></label>
       </div>
 
       <label class="grid gap-1.5 text-sm font-medium text-slate-700">Main Image Path <input class="form-control" name="image_path"></label>
@@ -100,6 +118,7 @@ admin_header($isEditing ? 'Edit Tour' : 'Add Tour', 'tours');
 $script = 'const tourId = ' . json_encode($tourId) . ';' . PHP_EOL . <<<'JS'
 
 const listFields = ['highlights', 'includes', 'excludes', 'what_to_bring', 'languages', 'gallery', 'tags'];
+const languageOptions = ['English', 'French', 'Spanish', 'Italian', 'Arabic', 'German', 'Hungarian', 'Polish', 'Russian'];
 const objectFields = {
   itinerary: ['time', 'activity'],
   faqs: ['q', 'a'],
@@ -154,7 +173,14 @@ function renderListField(field, values = []) {
   const rows = values.length ? values : [''];
   container.innerHTML = rows.map((value) => `
     <div class="flex gap-2" data-array-row>
-      <input class="form-control" data-item-input value="${escapeHtml(value)}">
+      ${field === 'languages'
+        ? `<select class="form-control" data-item-input>
+            <option value="">Select language</option>
+            ${(!languageOptions.includes(value) && value ? [value, ...languageOptions] : languageOptions)
+              .map((language) => `<option value="${escapeHtml(language)}"${language === value ? ' selected' : ''}>${escapeHtml(language)}</option>`)
+              .join('')}
+          </select>`
+        : `<input class="form-control" data-item-input value="${escapeHtml(value)}">`}
       <button class="danger grid h-10 w-10 shrink-0 place-items-center px-0 py-0" type="button" onclick="removeArrayRow(this)" title="Remove" aria-label="Remove"><i class="fa-solid fa-trash"></i></button>
     </div>
   `).join('');
@@ -252,7 +278,12 @@ async function loadTourForEdit() {
     if (!tour) throw new Error('Tour not found');
     const form = document.querySelector('#tourForm');
     for (const field of ['id', 'name', 'slug', 'category', 'location', 'duration', 'group_size', 'price', 'currency', 'rating', 'review_count', 'difficulty', 'display_order', 'image_path', 'description', 'cancellation']) {
-      form[field].value = tour[field] ?? '';
+      const input = form[field];
+      const value = tour[field] ?? '';
+      if (input?.tagName === 'SELECT' && value && ![...input.options].some((option) => option.value === String(value))) {
+        input.add(new Option(value, value));
+      }
+      input.value = value;
     }
     form.pickup.checked = Boolean(tour.pickup);
     for (const field of listFields) {
@@ -268,6 +299,8 @@ async function loadTourForEdit() {
 
 document.querySelector('#tourImageForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const uploadButton = document.querySelector('#tourImageUploadButton');
+  setButtonBusy(uploadButton, true);
   try {
     const data = await request(api('tour-image.php'), {
       method: 'POST',
@@ -280,6 +313,8 @@ document.querySelector('#tourImageForm').addEventListener('submit', async (event
     success('Tour image uploaded');
   } catch (error) {
     failure(error.message || 'Could not upload tour image');
+  } finally {
+    setButtonBusy(uploadButton, false);
   }
 });
 
@@ -298,7 +333,7 @@ document.querySelector('#tourForm').addEventListener('submit', async (event) => 
     const data = formDataToTour(event.currentTarget);
     const id = Number(data.id || 0);
     delete data.id;
-    await request(id ? `${api('tours.php')}?id=${id}` : api('tours.php'), {
+    await request(id ? api('tours.php', { id }) : api('tours.php'), {
       method: id ? 'PUT' : 'POST',
       headers: jsonHeaders(),
       body: JSON.stringify(data),

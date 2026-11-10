@@ -18,6 +18,7 @@ if ($method === 'GET') {
         $categoryStmt->execute([$siteId]);
         Response::json([
             'ok' => true,
+            'site' => site_slug_for_id($siteId),
             'count' => (int) $countStmt->fetchColumn(),
             'categories' => (int) $categoryStmt->fetchColumn(),
             'max' => $galleryMaxImages,
@@ -34,6 +35,7 @@ if ($method === 'GET') {
         $stmt->execute([$siteId]);
         Response::json([
             'ok' => true,
+            'site' => site_slug_for_id($siteId),
             'items' => $stmt->fetchAll(),
         ]);
     }
@@ -47,6 +49,7 @@ if ($method === 'GET') {
     }, $stmt->fetchAll());
     Response::json([
         'ok' => true,
+        'site' => site_slug_for_id($siteId),
         'items' => $items,
         'count' => count($items),
         'max' => $galleryMaxImages,
@@ -146,9 +149,41 @@ if ($method === 'DELETE') {
         if (!function_exists('admin_is_super_admin') || !admin_is_super_admin()) {
             Response::error('Super admin required', 403);
         }
-        $stmt = $pdo->prepare('DELETE FROM gallery_items WHERE id = ? AND site_id = ? AND is_active = 0');
-        $stmt->execute([$id, $siteId]);
-        Response::json(['ok' => true]);
+        $itemStmt = $pdo->prepare('SELECT image_path FROM gallery_items WHERE id = ? AND site_id = ? AND is_active = 0 LIMIT 1');
+        $itemStmt->execute([$id, $siteId]);
+        $imagePath = (string) ($itemStmt->fetchColumn() ?: '');
+        if ($imagePath === '') {
+            Response::error('Deleted gallery image not found', 404);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('DELETE FROM gallery_items WHERE id = ? AND site_id = ? AND is_active = 0');
+            $stmt->execute([$id, $siteId]);
+            $staffStmt = $pdo->prepare("UPDATE staff_uploads SET status = 'deleted' WHERE site_id = ? AND image_path = ? AND status = 'gallery'");
+            $staffStmt->execute([$siteId, $imagePath]);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        $fileDeleted = false;
+        $fileRetained = gallery_image_is_referenced($pdo, $siteId, $imagePath);
+        if (!$fileRetained) {
+            $filePath = site_upload_file_path($imagePath, $siteId, ['gallery', 'staff-gallery']);
+            $fileDeleted = $filePath !== null && unlink($filePath);
+        }
+        Response::json([
+            'ok' => true,
+            'fileDeleted' => $fileDeleted,
+            'fileRetained' => $fileRetained,
+            'message' => $fileDeleted
+                ? 'Gallery image and cPanel upload deleted.'
+                : ($fileRetained ? 'Gallery record deleted; the shared image file is still in use.' : 'Gallery record deleted; the upload file was already missing or could not be removed.'),
+        ]);
     }
 
     $stmt = $pdo->prepare('UPDATE gallery_items SET is_active = 0 WHERE id = ? AND site_id = ?');
@@ -157,3 +192,31 @@ if ($method === 'DELETE') {
 }
 
 Response::error('Method not allowed', 405);
+
+function gallery_image_is_referenced(PDO $pdo, int $siteId, string $imagePath): bool
+{
+    $galleryStmt = $pdo->prepare('SELECT COUNT(*) FROM gallery_items WHERE site_id = ? AND image_path = ?');
+    $galleryStmt->execute([$siteId, $imagePath]);
+    if ((int) $galleryStmt->fetchColumn() > 0) {
+        return true;
+    }
+
+    $staffStmt = $pdo->prepare("SELECT COUNT(*) FROM staff_uploads WHERE site_id = ? AND image_path = ? AND status <> 'deleted'");
+    $staffStmt->execute([$siteId, $imagePath]);
+    if ((int) $staffStmt->fetchColumn() > 0) {
+        return true;
+    }
+
+    $tourStmt = $pdo->prepare('SELECT image_path, gallery FROM tours WHERE site_id = ?');
+    $tourStmt->execute([$siteId]);
+    foreach ($tourStmt->fetchAll() as $tour) {
+        if (hash_equals((string) ($tour['image_path'] ?? ''), $imagePath)) {
+            return true;
+        }
+        $gallery = json_decode((string) ($tour['gallery'] ?? '[]'), true);
+        if (is_array($gallery) && in_array($imagePath, $gallery, true)) {
+            return true;
+        }
+    }
+    return false;
+}

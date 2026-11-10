@@ -39,6 +39,7 @@ if ($method === 'GET') {
         }
         Response::json([
             'ok' => true,
+            'site' => site_slug_for_id($siteId),
             'count' => (int) $countStmt->fetchColumn(),
             'withoutImages' => (int) $withoutImageStmt->fetchColumn(),
             'totalImages' => $imageTotal,
@@ -57,7 +58,7 @@ if ($method === 'GET') {
         if (!$tour) {
             Response::error('Tour not found', 404);
         }
-        Response::json(['ok' => true, 'tour' => decode_tour($tour)]);
+        Response::json(['ok' => true, 'site' => site_slug_for_id($siteId), 'tour' => decode_tour($tour)]);
     }
 
     $stmt = $pdo->prepare('SELECT * FROM tours WHERE site_id = ? AND is_active = 1 ORDER BY display_order, id');
@@ -65,6 +66,7 @@ if ($method === 'GET') {
     $tours = array_map('decode_tour', $stmt->fetchAll());
     Response::json([
         'ok' => true,
+        'site' => site_slug_for_id($siteId),
         'tours' => $tours,
         'count' => count($tours),
         'max' => $toursMaxItems,
@@ -105,6 +107,22 @@ if ($method === 'POST' || $method === 'PUT') {
         Response::error('Tour name is required');
     }
     $data['slug'] = $data['slug'] ?? slugify((string) $data['name']);
+    $data['price'] = (float) ($data['price'] ?? 0);
+    $data['rating'] = (float) ($data['rating'] ?? 0);
+    $data['review_count'] = (int) ($data['review_count'] ?? 0);
+    $data['display_order'] = (int) ($data['display_order'] ?? 0);
+    if ($data['price'] < 0) {
+        Response::error('Price cannot be negative.');
+    }
+    if ($data['rating'] < 0 || $data['rating'] > 5) {
+        Response::error('Rating must be between 0 and 5.');
+    }
+    if ($data['review_count'] < 0) {
+        Response::error('Review count cannot be negative.');
+    }
+    if ($data['display_order'] < 0) {
+        Response::error('Display order cannot be negative.');
+    }
 
     foreach (['highlights', 'includes', 'excludes', 'what_to_bring', 'languages', 'gallery', 'itinerary', 'faqs', 'tags'] as $field) {
         $data[$field] = json_field($data[$field] ?? []);

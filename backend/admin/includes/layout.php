@@ -22,7 +22,9 @@ function admin_header(string $title, string $active): void
         ? 'feature:' . trim((string) ($_GET['module'] ?? ''))
         : $active;
     $isSuperAdmin = admin_is_super_admin();
-    $selectedSiteLabel = admin_selected_site_label();
+    $selectedSite = admin_selected_site();
+    $selectedSiteLabel = $selectedSite ? (string) $selectedSite['site_name'] : 'All sites';
+    $selectedSiteSlug = (string) ($selectedSite['site_slug'] ?? '');
     ?><!doctype html>
 <html lang="en">
 <head>
@@ -307,7 +309,13 @@ function admin_header(string $title, string $active): void
       </header>
       <main class="p-5 lg:p-7">
   <script>
-    const api = (path) => `/backend/api/${path}`;
+    const selectedSiteSlug = <?= json_encode($selectedSiteSlug) ?>;
+    const api = (path, params = {}) => {
+      const url = new URL(`/backend/api/${path}`, window.location.origin);
+      if (selectedSiteSlug) url.searchParams.set('site', selectedSiteSlug);
+      Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+      return `${url.pathname}${url.search}`;
+    };
     const adminPage = (path) => `<?= admin_secure_path() ?>${path}`;
     const adminToken = <?= json_encode($token) ?>;
     const initialAdminTheme = <?= json_encode($theme) ?>;
@@ -330,6 +338,20 @@ function admin_footer(string $pageScript = ''): void
     const toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200, timerProgressBar: true });
     function success(message) { status(message); toast.fire({ icon: 'success', title: message }); }
     function failure(message) { status(message); toast.fire({ icon: 'error', title: message }); }
+    function setButtonBusy(button, busy, label = 'Uploading...') {
+      if (!button) return;
+      if (busy) {
+        button.dataset.idleHtml = button.innerHTML;
+        button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>${label}</span>`;
+        button.disabled = true;
+        button.classList.add('cursor-wait', 'opacity-70');
+        return;
+      }
+      if (button.dataset.idleHtml) button.innerHTML = button.dataset.idleHtml;
+      delete button.dataset.idleHtml;
+      button.disabled = false;
+      button.classList.remove('cursor-wait', 'opacity-70');
+    }
     async function confirmDelete(title = 'Delete this item?') {
       const result = await Swal.fire({ title, text: 'This action cannot be undone from the admin panel.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', cancelButtonColor: '#64748b', confirmButtonText: 'Delete', cancelButtonText: 'Cancel' });
       return result.isConfirmed;
@@ -398,7 +420,7 @@ function admin_footer(string $pageScript = ''): void
     function closeSidebar() { document.body.classList.remove('sidebar-open'); }
     document.querySelector('#mobileNav')?.addEventListener('change', (event) => { window.location.href = event.target.value; });
     async function request(url, options = {}) {
-      const res = await fetch(url, options);
+      const res = await fetch(url, { cache: 'no-store', ...options });
       const text = await res.text();
       let data = null;
       try {

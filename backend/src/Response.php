@@ -8,6 +8,9 @@ final class Response
     {
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Vary: X-Admin-Token, X-Site-API-Key', false);
         echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -17,4 +20,3 @@ final class Response
         self::json(['ok' => false, 'error' => $message] + $extra, $status);
     }
 }
-

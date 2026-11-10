@@ -12,6 +12,23 @@ function settings_json(array $data, int $status = 200): never
     exit;
 }
 
+function settings_require_selected_site_user(int $userId): array
+{
+    $siteId = admin_selected_site_id();
+    if ($siteId < 1 || $userId < 1) {
+        settings_json(['ok' => false, 'error' => 'Choose a site before managing its admin user'], 400);
+    }
+
+    $stmt = Database::pdo()->prepare('SELECT * FROM admin_users WHERE id = ? AND site_id = ? LIMIT 1');
+    $stmt->execute([$userId, $siteId]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        settings_json(['ok' => false, 'error' => 'Admin user does not belong to the selected site'], 403);
+    }
+
+    return $user;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_admin_page();
     if (!hash_equals(admin_token(), (string) ($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? ''))) {
@@ -72,13 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $userControls = $_POST['users'] ?? [];
             $buildPermissions = static function (int $userId, array $controls): array {
+                settings_require_selected_site_user($userId);
                 $stmt = Database::pdo()->prepare(
                     'SELECT sites.business_type
                      FROM admin_users AS users
                      LEFT JOIN company_sites AS sites ON sites.id = users.site_id
-                     WHERE users.id = ? LIMIT 1'
+                     WHERE users.id = ? AND users.site_id = ? LIMIT 1'
                 );
-                $stmt->execute([$userId]);
+                $stmt->execute([$userId, admin_selected_site_id()]);
                 $businessType = (string) ($stmt->fetchColumn() ?: 'general-business');
                 $permissions = admin_site_permissions($businessType);
                 foreach (array_keys(admin_permission_options_for_business_type($businessType)) as $key) {
@@ -104,7 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!admin_is_super_admin()) {
                 settings_json(['ok' => false, 'error' => 'Super admin required'], 403);
             }
-            if (!admin_delete_user((int) ($_POST['user_id'] ?? 0))) {
+            $userId = (int) ($_POST['user_id'] ?? 0);
+            settings_require_selected_site_user($userId);
+            if (!admin_delete_user($userId)) {
                 settings_json(['ok' => false, 'error' => 'This user cannot be deleted'], 400);
             }
             settings_json(['ok' => true]);
@@ -163,16 +183,20 @@ require_admin_page('settings');
 admin_ensure_users_table();
 $currentTheme = admin_theme();
 $isSuperAdmin = admin_is_super_admin();
-$users = $isSuperAdmin
-    ? Database::pdo()->query(
+$selectedSite = admin_selected_site();
+$users = [];
+if ($isSuperAdmin && $selectedSite) {
+    $usersStmt = Database::pdo()->prepare(
         'SELECT users.id, users.username, users.theme, users.role, users.permissions, users.site_id, users.is_active, users.created_at,
                 sites.site_name, sites.business_type
          FROM admin_users AS users
          LEFT JOIN company_sites AS sites ON sites.id = users.site_id
+         WHERE users.site_id = ?
          ORDER BY users.username'
-    )->fetchAll()
-    : [];
-$selectedSite = admin_selected_site();
+    );
+    $usersStmt->execute([(int) $selectedSite['id']]);
+    $users = $usersStmt->fetchAll();
+}
 $brandName = admin_setting('brand_name', 'Judylink');
 $brandSubtitle = admin_setting('brand_subtitle', 'Tours & travel control');
 $brandLogo = admin_setting('brand_logo', '');
@@ -259,9 +283,10 @@ admin_header('Settings', 'settings');
       </div>
     </article>
 
-    <?php if ($isSuperAdmin): ?>
+    <?php if ($isSuperAdmin && $selectedSite): ?>
       <article class="admin-card">
-        <h3 class="mb-4 text-base font-medium">Admin Users</h3>
+        <h3 class="mb-1 text-base font-medium">Admin Users</h3>
+        <p class="mb-4 text-xs text-slate-500">Only for <?= htmlspecialchars((string) $selectedSite['site_name'], ENT_QUOTES, 'UTF-8') ?></p>
         <div id="usersList" class="grid gap-2 text-sm">
           <?php foreach ($users as $user): ?>
             <div class="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2" data-user-row="<?= htmlspecialchars((string) $user['username'], ENT_QUOTES, 'UTF-8') ?>">
@@ -272,6 +297,9 @@ admin_header('Settings', 'settings');
               <span class="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600" data-user-theme><?= htmlspecialchars((string) $user['theme'], ENT_QUOTES, 'UTF-8') ?></span>
             </div>
           <?php endforeach; ?>
+          <?php if (!$users): ?>
+            <p class="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">No admin user is assigned to this site.</p>
+          <?php endif; ?>
         </div>
       </article>
     <?php endif; ?>
@@ -309,7 +337,8 @@ admin_header('Settings', 'settings');
 
       <?php if ($isSuperAdmin): ?>
       <article class="admin-card">
-        <h3 class="mb-4 text-base font-medium">Admin Access Control</h3>
+        <h3 class="mb-1 text-base font-medium">Admin Access Control</h3>
+        <p class="mb-4 text-xs text-slate-500">Only for <?= htmlspecialchars((string) $selectedSite['site_name'], ENT_QUOTES, 'UTF-8') ?></p>
         <form id="userControlsForm" class="grid gap-3">
           <input type="hidden" name="action" value="user_controls">
           <?php foreach (array_filter($users, fn ($user) => ($user['username'] ?? '') !== ADMIN_USERNAME) as $user): ?>
@@ -347,6 +376,9 @@ admin_header('Settings', 'settings');
               <button class="danger inline-flex w-fit items-center justify-center gap-2" type="button" onclick="deleteAdminUser(<?= (int) $user['id'] ?>, '<?= htmlspecialchars((string) $user['username'], ENT_QUOTES, 'UTF-8') ?>')"><i class="fa-solid fa-trash"></i>Delete User</button>
             </div>
           <?php endforeach; ?>
+          <?php if (!array_filter($users, fn ($user) => ($user['username'] ?? '') !== ADMIN_USERNAME)): ?>
+            <p class="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">No admin access is available for this site.</p>
+          <?php endif; ?>
         </form>
       </article>
       <?php endif; ?>
@@ -500,7 +532,7 @@ async function loadDeletedGallery() {
   const list = document.querySelector('#deletedGalleryList');
   list.innerHTML = deletedGalleryLoadingMarkup();
   try {
-    const data = await request(`${api('gallery.php')}?deleted=1`, { headers: adminHeaders() });
+    const data = await request(api('gallery.php', { deleted: 1 }), { headers: adminHeaders() });
     const items = data.items || [];
     list.innerHTML = items.map((item) => `
       <article class="grid gap-3 rounded-lg border border-slate-200 bg-white p-2 shadow-lg shadow-slate-900/5 sm:grid-cols-[88px_minmax(0,1fr)] sm:items-center">
@@ -524,7 +556,7 @@ async function loadDeletedGallery() {
 
 async function restoreDeletedGallery(id) {
   try {
-    await request(`${api('gallery.php')}?id=${id}`, { method: 'PATCH', headers: adminHeaders() });
+    await request(api('gallery.php', { id }), { method: 'PATCH', headers: adminHeaders() });
     success('Gallery image restored');
     loadDeletedGallery();
   } catch (error) {
@@ -533,11 +565,11 @@ async function restoreDeletedGallery(id) {
 }
 
 async function permanentDeleteGallery(id) {
-  if (!await confirmDelete('Permanently delete this image?')) return;
+  if (!await confirmDelete('Permanently delete this image and its unused cPanel upload?')) return;
   try {
-    await request(`${api('gallery.php')}?id=${id}&permanent=1`, { method: 'DELETE', headers: adminHeaders() });
-    success('Gallery image permanently deleted');
-    loadDeletedGallery();
+    const result = await request(api('gallery.php', { id, permanent: 1 }), { method: 'DELETE', headers: adminHeaders() });
+    success(result.message || 'Gallery image permanently deleted');
+    await loadDeletedGallery();
   } catch (error) {
     failure(error.message || 'Could not permanently delete image');
   }

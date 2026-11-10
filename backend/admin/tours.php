@@ -53,7 +53,18 @@ admin_header('Tours', 'tours');
         <input type="hidden" name="image_path">
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <label class="grid gap-1.5 text-sm font-medium text-slate-700">Name <input class="form-control" name="name" placeholder="Prison Island" required></label>
-          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Category <input class="form-control" name="category" placeholder="Mnemba"></label>
+          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Category
+            <select class="form-control" name="category">
+              <option value="Activities">Activities</option>
+              <option value="Beach">Beach</option>
+              <option value="Culture">Culture</option>
+              <option value="Nature">Nature</option>
+              <option value="Tours">Tours</option>
+              <option value="Hotels">Hotels</option>
+              <option value="Food">Food</option>
+              <option value="Unique">Unique</option>
+            </select>
+          </label>
           <label class="grid gap-1.5 text-sm font-medium text-slate-700">Location <input class="form-control" name="location" placeholder="Stone Town, Zanzibar"></label>
           <label class="grid gap-1.5 text-sm font-medium text-slate-700">Duration
             <select class="form-control" name="duration">
@@ -75,7 +86,6 @@ admin_header('Tours', 'tours');
               <option value="Family friendly">Family friendly</option>
             </select>
           </label>
-          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Price <input class="form-control" name="price" type="number" step="0.01" placeholder="45.00"></label>
           <label class="grid gap-1.5 text-sm font-medium text-slate-700">Currency
             <select class="form-control" name="currency">
               <option value="USD">USD</option>
@@ -84,8 +94,9 @@ admin_header('Tours', 'tours');
               <option value="GBP">GBP</option>
             </select>
           </label>
-          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Rating <input class="form-control" name="rating" type="number" step="0.1" placeholder="4.9"></label>
-          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Reviews <input class="form-control" name="review_count" type="number" placeholder="33"></label>
+          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Price <input class="form-control" name="price" type="number" min="0" step="0.01" placeholder="45.00"></label>
+          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Rating (0–5) <input class="form-control" name="rating" type="number" min="0" max="5" step="0.1" placeholder="4.9"></label>
+          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Reviews <input class="form-control" name="review_count" type="number" min="0" step="1" placeholder="33"></label>
           <label class="grid gap-1.5 text-sm font-medium text-slate-700">Difficulty
             <select class="form-control" name="difficulty">
               <option value="Easy">Easy</option>
@@ -93,7 +104,7 @@ admin_header('Tours', 'tours');
               <option value="Challenging">Challenging</option>
             </select>
           </label>
-          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Display Order <input class="form-control" name="display_order" type="number" placeholder="10"></label>
+          <label class="grid gap-1.5 text-sm font-medium text-slate-700">Display Order <input class="form-control" name="display_order" type="number" min="0" step="1" placeholder="10"></label>
         </div>
 
         <section class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
@@ -168,6 +179,7 @@ $script = 'const publicAppUrl = ' . json_encode($publicAppUrl) . ';' . PHP_EOL .
 let tours = [];
 let toursMaxItems = 20;
 const listFields = ['highlights', 'includes', 'excludes', 'what_to_bring', 'languages', 'tags'];
+const languageOptions = ['English', 'French', 'Spanish', 'Italian', 'Arabic', 'German', 'Hungarian', 'Polish', 'Russian'];
 const objectFields = {
   itinerary: ['time', 'activity'],
   faqs: ['q', 'a'],
@@ -311,7 +323,7 @@ async function togglePopularTour(id, input) {
 
   input.disabled = true;
   try {
-    await request(`${api('tours.php')}?id=${id}`, {
+    await request(api('tours.php', { id }), {
       method: 'PATCH',
       headers: jsonHeaders(),
       body: JSON.stringify({ is_popular: checked }),
@@ -400,7 +412,14 @@ function renderListField(field, values = []) {
   const rows = values.length ? values : [''];
   listContainer(field).innerHTML = rows.map((value) => `
     <div class="flex gap-2" data-array-row>
-      <input class="form-control" data-item-input placeholder="${escapeHtml(listPlaceholders[field] || 'Add item')}" value="${escapeHtml(value)}">
+      ${field === 'languages'
+        ? `<select class="form-control" data-item-input>
+            <option value="">Select language</option>
+            ${(!languageOptions.includes(value) && value ? [value, ...languageOptions] : languageOptions)
+              .map((language) => `<option value="${escapeHtml(language)}"${language === value ? ' selected' : ''}>${escapeHtml(language)}</option>`)
+              .join('')}
+          </select>`
+        : `<input class="form-control" data-item-input placeholder="${escapeHtml(listPlaceholders[field] || 'Add item')}" value="${escapeHtml(value)}">`}
       <button class="danger grid h-10 w-10 shrink-0 place-items-center px-0 py-0" type="button" onclick="removeArrayRow(this)" title="Remove"><i class="fa-solid fa-trash"></i></button>
     </div>
   `).join('');
@@ -474,6 +493,10 @@ async function uploadGalleryImage(input) {
   const row = input.closest('[data-gallery-row]');
   const body = new FormData();
   body.append('image', file);
+  const preview = row.querySelector('[data-gallery-preview]');
+  const previousPreview = preview.innerHTML;
+  input.disabled = true;
+  preview.innerHTML = '<span class="grid place-items-center gap-2 text-sm font-medium text-sky-600"><i class="fa-solid fa-spinner fa-spin text-xl"></i>Uploading image...</span>';
   try {
     const data = await request(api('tour-image.php'), {
       method: 'POST',
@@ -481,12 +504,15 @@ async function uploadGalleryImage(input) {
       body,
     });
     row.querySelector('[data-gallery-path]').value = data.image_path;
-    row.querySelector('[data-gallery-preview]').innerHTML = `<img class="h-full w-full object-cover" src="${media(data.image_path)}" alt="">`;
+    preview.innerHTML = `<img class="h-full w-full object-cover" src="${media(data.image_path)}" alt="">`;
     syncField('gallery', galleryValues());
     success('Gallery image uploaded');
   } catch (error) {
     input.value = '';
+    preview.innerHTML = previousPreview;
     failure(error.message || 'Could not upload gallery image');
+  } finally {
+    input.disabled = false;
   }
 }
 
@@ -495,6 +521,10 @@ async function uploadMainImage(input) {
   if (!file) return;
   const body = new FormData();
   body.append('image', file);
+  const preview = document.querySelector('#mainImagePreview');
+  const previousPreview = preview.innerHTML;
+  input.disabled = true;
+  preview.innerHTML = '<span class="grid place-items-center gap-2 text-sm font-medium text-sky-600"><i class="fa-solid fa-spinner fa-spin text-xl"></i>Uploading image...</span>';
   try {
     const data = await request(api('tour-image.php'), {
       method: 'POST',
@@ -507,7 +537,10 @@ async function uploadMainImage(input) {
     success('Main image uploaded');
   } catch (error) {
     input.value = '';
+    preview.innerHTML = previousPreview;
     failure(error.message || 'Could not upload main image');
+  } finally {
+    input.disabled = false;
   }
 }
 
@@ -607,14 +640,14 @@ document.querySelector('#tourForm').addEventListener('submit', async (event) => 
     const data = formDataToTour(event.currentTarget);
     const id = Number(data.id || 0);
     delete data.id;
-    await request(id ? `${api('tours.php')}?id=${id}` : api('tours.php'), {
+    await request(id ? api('tours.php', { id }) : api('tours.php'), {
       method: id ? 'PUT' : 'POST',
       headers: jsonHeaders(),
       body: JSON.stringify(data),
     });
+    await loadTours();
     closeTourForm();
     success('Tour saved');
-    loadTours();
   } catch (error) {
     failure(error.message || 'Could not save tour');
   }
@@ -623,9 +656,9 @@ document.querySelector('#tourForm').addEventListener('submit', async (event) => 
 async function deleteTour(id) {
   if (!await confirmDelete('Delete this tour?')) return;
   try {
-    await request(`${api('tours.php')}?id=${id}`, { method: 'DELETE', headers: adminHeaders() });
+    await request(api('tours.php', { id }), { method: 'DELETE', headers: adminHeaders() });
     success('Tour deleted');
-    loadTours();
+    await loadTours();
   } catch (error) {
     failure(error.message || 'Could not delete tour');
   }

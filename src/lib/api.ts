@@ -29,6 +29,12 @@ function siteApiHeaders(): HeadersInit {
   return SITE_API_KEY ? { "X-Site-API-Key": SITE_API_KEY } : {};
 }
 
+function assertExpectedSite(data: { site?: unknown }) {
+  if (SITE_SLUG && data.site !== SITE_SLUG) {
+    throw new Error("The server returned data for a different site. Please reload and try again.");
+  }
+}
+
 async function readApiJson(response: Response, fallbackMessage: string) {
   const text = await response.text();
   if (!text.trim()) {
@@ -256,11 +262,13 @@ function toTour(tour: ApiTour): Tour {
 export async function fetchTours() {
   const response = await fetch(siteApiUrl("tours.php"), {
     headers: siteApiHeaders(),
+    cache: "no-store",
   });
   const data = await readApiJson(response, "Could not load tours");
   if (!response.ok || !data?.ok) {
     throw new Error(data?.error || "Could not load tours");
   }
+  assertExpectedSite(data);
   return (data.tours as ApiTour[]).map(toTour);
 }
 
@@ -269,22 +277,26 @@ export async function fetchTour(slug: string) {
   url.searchParams.set("slug", slug);
   const response = await fetch(url, {
     headers: siteApiHeaders(),
+    cache: "no-store",
   });
   const data = await readApiJson(response, "Could not load tour");
   if (!response.ok || !data?.ok) {
     throw new Error(data?.error || "Could not load tour");
   }
+  assertExpectedSite(data);
   return toTour(data.tour as ApiTour);
 }
 
 export async function fetchGalleryItems() {
   const response = await fetch(siteApiUrl("gallery.php"), {
     headers: siteApiHeaders(),
+    cache: "no-store",
   });
   const data = await readApiJson(response, "Could not load gallery");
   if (!response.ok || !data?.ok) {
     throw new Error(data?.error || "Could not load gallery");
   }
+  assertExpectedSite(data);
   return (data.items as Array<{
     id: number;
     image_path: string;

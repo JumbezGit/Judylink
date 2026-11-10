@@ -1,6 +1,5 @@
-const CACHE_VERSION = "judylink-pwa-v2";
+const CACHE_VERSION = "judylink-pwa-v3";
 const APP_CACHE = `${CACHE_VERSION}-app`;
-const API_CACHE = `${CACHE_VERSION}-api`;
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg", "/pwa-logo.webp"];
 
 self.addEventListener("install", (event) => {
@@ -19,19 +18,6 @@ self.addEventListener("activate", (event) => {
 
 function isCacheableApiRequest(url) {
   return url.pathname.endsWith("/tours.php") || url.pathname.endsWith("/gallery.php");
-}
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(API_CACHE);
-  const cached = await cache.match(request);
-  const network = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => cached);
-
-  return cached || network;
 }
 
 async function networkFirstNavigation(request) {
@@ -63,7 +49,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (isCacheableApiRequest(url)) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(fetch(request));
     return;
   }
 

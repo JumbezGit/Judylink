@@ -85,6 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'details') {
         $domain = trim((string) ($_POST['primary_domain'] ?? ''));
         $note = trim((string) ($_POST['admin_note'] ?? ''));
+        if ($domain !== '' && !preg_match('#^https?://#i', $domain)) {
+            $domain = 'https://' . $domain;
+        }
+        if ($domain !== '' && (!filter_var($domain, FILTER_VALIDATE_URL) || !in_array(strtolower((string) parse_url($domain, PHP_URL_SCHEME)), ['http', 'https'], true))) {
+            sites_json(['ok' => false, 'error' => 'Site website URL must be a valid HTTP or HTTPS address'], 400);
+        }
         $stmt = $pdo->prepare('UPDATE company_sites SET primary_domain = ?, admin_note = ? WHERE id = ?');
         $stmt->execute([$domain !== '' ? $domain : null, $note !== '' ? $note : null, $id]);
         sites_json(['ok' => true, 'primaryDomain' => $domain, 'adminNote' => $note]);
@@ -182,6 +188,7 @@ admin_header('Sites', 'sites');
                   <button class="secondary" type="button" onclick="siteSetup(<?= $id ?>, 'in_progress')">Setup</button>
                   <button class="primary" type="button" onclick="siteSetup(<?= $id ?>, 'ready')">Ready</button>
                   <button class="secondary" type="button" onclick="editSite(<?= $id ?>, <?= sites_h(json_encode((string) ($site['primary_domain'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>, <?= sites_h(json_encode((string) ($site['admin_note'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>)">Edit</button>
+                  <button class="secondary" type="button" onclick="copySiteLoginLink(<?= sites_h(json_encode(admin_url() . '?site=' . rawurlencode((string) $site['site_slug']), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>)"><i class="fa-solid fa-link"></i>Login Link</button>
                   <button class="secondary" type="button" onclick="openSiteApi(<?= $id ?>, <?= sites_h(json_encode((string) $site['site_slug'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>, <?= sites_h(json_encode((string) ($site['api_key'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>)"><i class="fa-solid fa-code"></i>API</button>
                 </div>
               </td>
@@ -201,14 +208,14 @@ admin_header('Sites', 'sites');
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
         <h3 class="text-lg font-semibold text-slate-900">Site Details</h3>
-        <p class="mt-1 text-sm text-slate-500">Update domain and admin notes.</p>
+        <p class="mt-1 text-sm text-slate-500">Set the site website URL used by its login page’s “Go back home” link.</p>
       </div>
       <button class="secondary" type="button" onclick="closeSiteModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <input type="hidden" name="action" value="details">
     <input type="hidden" name="id" id="siteEditId">
-    <label class="mb-1.5 block text-sm font-medium text-slate-700" for="siteDomain">Primary domain</label>
-    <input class="form-control mb-4" name="primary_domain" id="siteDomain" placeholder="example.com">
+    <label class="mb-1.5 block text-sm font-medium text-slate-700" for="siteDomain">Site website URL</label>
+    <input class="form-control mb-4" name="primary_domain" id="siteDomain" placeholder="https://example.com/">
     <label class="mb-1.5 block text-sm font-medium text-slate-700" for="siteNote">Admin note</label>
     <textarea class="form-control min-h-28" name="admin_note" id="siteNote" placeholder="DNS, setup, owner request, suspension reason..."></textarea>
     <button class="primary mt-4" type="submit"><i class="fa-regular fa-floppy-disk"></i>Save</button>
@@ -251,6 +258,16 @@ admin_header('Sites', 'sites');
 
 <?php
 admin_footer(<<<'JS'
+async function copySiteLoginLink(path) {
+  const url = new URL(path, window.location.origin).toString();
+  try {
+    await navigator.clipboard.writeText(url);
+    success('Site login link copied');
+  } catch (error) {
+    window.prompt('Copy this site login link:', url);
+  }
+}
+
 function siteClass(status) {
   if (status === 'active' || status === 'ready') return 'border border-emerald-500 text-emerald-700';
   if (status === 'suspended' || status === 'archived' || status === 'blocked') return 'border border-red-500 text-red-700';

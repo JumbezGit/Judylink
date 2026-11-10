@@ -19,6 +19,13 @@ $result = [
         'pdo_mysql' => extension_loaded('pdo_mysql'),
         'gd' => extension_loaded('gd'),
         'fileinfo' => extension_loaded('fileinfo'),
+        'exif' => extension_loaded('exif'),
+        'imagick' => extension_loaded('imagick'),
+    ],
+    'uploads' => [
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'post_max_size' => ini_get('post_max_size'),
+        'memory_limit' => ini_get('memory_limit'),
     ],
 ];
 

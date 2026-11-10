@@ -64,7 +64,7 @@ admin_header('Gallery', 'gallery');
       </div>
       <div class="grid gap-2 sm:flex sm:justify-end">
         <button class="secondary w-full sm:w-auto" type="button" onclick="closeGalleryModal()">Cancel</button>
-        <button class="primary w-full sm:w-auto" type="submit">Save</button>
+        <button id="gallerySaveButton" class="primary w-full sm:w-auto" type="submit"><i class="fa-solid fa-upload"></i><span>Save Image</span></button>
       </div>
     </form>
   </div>
@@ -195,27 +195,34 @@ function closeGalleryModal() {
 
 document.querySelector('#galleryForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const form = event.currentTarget;
+  const saveButton = document.querySelector('#gallerySaveButton');
+  setButtonBusy(saveButton, true, form.id.value ? 'Updating...' : 'Uploading...');
+  form.setAttribute('aria-busy', 'true');
   try {
-    event.currentTarget.alt_text.value = event.currentTarget.title.value.trim();
+    form.alt_text.value = form.title.value.trim();
     await request(api('gallery.php'), {
       method: 'POST',
       headers: adminHeaders(),
-      body: new FormData(event.currentTarget),
+      body: new FormData(form),
     });
+    await loadGallery();
     closeGalleryModal();
-    success('Gallery image saved');
-    loadGallery();
+    success('Gallery image uploaded and displayed');
   } catch (error) {
     failure(error.message || 'Could not save gallery image');
+  } finally {
+    form.removeAttribute('aria-busy');
+    setButtonBusy(saveButton, false);
   }
 });
 
 async function deleteGallery(id) {
   if (!await confirmDelete('Delete this gallery image?')) return;
   try {
-    await request(`${api('gallery.php')}?id=${id}`, { method: 'DELETE', headers: adminHeaders() });
+    await request(api('gallery.php', { id }), { method: 'DELETE', headers: adminHeaders() });
     success('Gallery image deleted');
-    loadGallery();
+    await loadGallery();
   } catch (error) {
     failure(error.message || 'Could not delete gallery image');
   }

@@ -883,7 +883,29 @@ function admin_current_user(): ?array
     return admin_user_by_username($username);
 }
 
-function admin_login(string $username, string $password): bool
+function admin_login_site_by_slug(string $siteSlug): ?array
+{
+    $siteSlug = trim($siteSlug);
+    if ($siteSlug === '') {
+        return null;
+    }
+
+    admin_ensure_company_registration_tables();
+    $stmt = Database::pdo()->prepare(
+        'SELECT sites.id, sites.site_name, sites.site_slug, sites.status, sites.primary_domain,
+                COALESCE(logo_setting.setting_value, "") AS brand_logo
+         FROM company_sites AS sites
+         LEFT JOIN site_settings AS logo_setting
+           ON logo_setting.site_id = sites.id AND logo_setting.setting_key = "brand_logo"
+         WHERE sites.site_slug = ?
+         LIMIT 1'
+    );
+    $stmt->execute([$siteSlug]);
+    $site = $stmt->fetch();
+    return is_array($site) ? $site : null;
+}
+
+function admin_login(string $username, string $password, ?int $requiredSiteId = null): bool
 {
     $user = admin_user_by_username($username);
     if (!$user || !password_verify($password, (string) $user['password_hash'])) {
@@ -891,6 +913,9 @@ function admin_login(string $username, string $password): bool
     }
 
     $siteId = (int) ($user['site_id'] ?? 0);
+    if ($requiredSiteId !== null && ($requiredSiteId < 1 || $siteId !== $requiredSiteId)) {
+        return false;
+    }
     if ($siteId > 0) {
         admin_ensure_company_registration_tables();
         $siteStmt = Database::pdo()->prepare('SELECT status FROM company_sites WHERE id = ? LIMIT 1');
@@ -971,11 +996,15 @@ function admin_username(): string
 function admin_available_sites(): array
 {
     admin_ensure_company_registration_tables();
+    admin_ensure_settings_table();
     return Database::pdo()->query(
         'SELECT sites.id, sites.site_ref, sites.site_name, sites.site_slug, sites.primary_domain,
-                sites.status, sites.setup_status, registrations.website_type
+                sites.status, sites.setup_status, registrations.website_type,
+                COALESCE(logo_setting.setting_value, "") AS brand_logo
          FROM company_sites AS sites
          INNER JOIN company_registrations AS registrations ON registrations.id = sites.company_registration_id
+         LEFT JOIN site_settings AS logo_setting
+           ON logo_setting.site_id = sites.id AND logo_setting.setting_key = "brand_logo"
          ORDER BY FIELD(sites.status, "active", "pending_setup", "suspended", "archived"), sites.site_name'
     )->fetchAll();
 }

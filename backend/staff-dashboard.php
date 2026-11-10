@@ -76,27 +76,46 @@ function staff_upload_error(string $message): never
 
 function staff_save_upload_image_file(array $file, int $siteId): string
 {
-    $maxSavedBytes = 1024 * 1024;
+    $maxSavedBytes = IMAGE_MAX_UPLOAD_BYTES;
 
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        staff_upload_error('Image upload failed');
+    $uploadError = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($uploadError !== UPLOAD_ERR_OK) {
+        $message = match ($uploadError) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'The server PHP upload limit is below the required 10 MB. Set upload_max_filesize to at least 16M.',
+            UPLOAD_ERR_PARTIAL => 'The image upload was interrupted. Check your connection and try again.',
+            default => 'Image upload failed. Please try again.',
+        };
+        staff_upload_error($message);
     }
-    if ((int) ($file['size'] ?? 0) > IMAGE_MAX_UPLOAD_BYTES) {
-        staff_upload_error('Image must be 2 MB or smaller');
+    $sourceMaxBytes = defined('IMAGE_MAX_SOURCE_BYTES') ? IMAGE_MAX_SOURCE_BYTES : 10 * 1024 * 1024;
+    if ((int) ($file['size'] ?? 0) > $sourceMaxBytes) {
+        staff_upload_error('Source image must be 10 MB or smaller');
     }
     if (!function_exists('imagewebp')) {
         staff_upload_error('PHP GD extension is required for image upload');
     }
 
-    $mime = mime_content_type((string) $file['tmp_name']);
-    $source = match ($mime) {
-        'image/jpeg' => imagecreatefromjpeg((string) $file['tmp_name']),
-        'image/png' => imagecreatefrompng((string) $file['tmp_name']),
-        'image/webp' => imagecreatefromwebp((string) $file['tmp_name']),
-        default => false,
-    };
+    $temporaryPath = (string) $file['tmp_name'];
+    $mime = (string) (mime_content_type($temporaryPath) ?: '');
+    $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+    if ($mime === 'application/octet-stream' && in_array($extension, ['heic', 'heif'], true)) {
+        $mime = 'image/heic';
+    }
+    if (in_array($mime, ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'], true) && !class_exists('Imagick')) {
+        staff_upload_error('This server cannot convert HEIC. On iPhone choose Camera > Formats > Most Compatible, or upload a JPG image.');
+    }
+    if ($mime === 'image/avif' && !function_exists('imagecreatefromavif') && !class_exists('Imagick')) {
+        staff_upload_error('This server cannot convert AVIF. Please upload a JPG, PNG, or WEBP image.');
+    }
+
+    $dimensions = @getimagesize($temporaryPath);
+    if (is_array($dimensions) && ((int) $dimensions[0] * (int) $dimensions[1]) > 64_000_000) {
+        staff_upload_error('Image resolution is too large. Use an image smaller than 64 megapixels.');
+    }
+
+    $source = staff_decode_upload_image($temporaryPath, $mime);
     if (!$source) {
-        staff_upload_error('Only JPG, PNG, and WEBP images are allowed');
+        staff_upload_error('Could not decode this phone image. Upload JPG, PNG, WEBP, AVIF, HEIC, or HEIF.');
     }
 
     $width = imagesx($source);
@@ -136,10 +155,61 @@ function staff_save_upload_image_file(array $file, int $siteId): string
         if (is_file($target)) {
             unlink($target);
         }
-        staff_upload_error('Image could not be reduced below 1 MB');
+        staff_upload_error('Image could not be reduced below 2 MB');
     }
 
     return rtrim(PUBLIC_UPLOAD_BASE, '/') . '/' . $folder . '/' . $name;
+}
+
+function staff_decode_upload_image(string $path, string $mime): GdImage|false
+{
+    if ($mime === 'image/jpeg') {
+        $image = @imagecreatefromjpeg($path);
+        if (!$image || !function_exists('exif_read_data')) {
+            return $image;
+        }
+        $exif = @exif_read_data($path);
+        $orientation = (int) ($exif['Orientation'] ?? 1);
+        $angle = match ($orientation) {
+            3 => 180,
+            6 => -90,
+            8 => 90,
+            default => 0,
+        };
+        if ($angle === 0) {
+            return $image;
+        }
+        $rotated = imagerotate($image, $angle, 0);
+        if (!$rotated) {
+            return $image;
+        }
+        imagedestroy($image);
+        return $rotated;
+    }
+    if ($mime === 'image/png') {
+        return @imagecreatefrompng($path);
+    }
+    if ($mime === 'image/webp') {
+        return @imagecreatefromwebp($path);
+    }
+    if ($mime === 'image/avif' && function_exists('imagecreatefromavif')) {
+        return @imagecreatefromavif($path);
+    }
+    if (class_exists('Imagick')) {
+        try {
+            $image = new Imagick();
+            $image->readImage($path);
+            $image->setIteratorIndex(0);
+            $image->setImageFormat('png');
+            $decoded = @imagecreatefromstring($image->getImageBlob());
+            $image->clear();
+            $image->destroy();
+            return $decoded;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+    return false;
 }
 
 function staff_uploaded_images(): array
@@ -1625,7 +1695,7 @@ if (count($activeTaskSection['tasks']) === 0) {
     }
 
     async function compressStaffImage(file) {
-      const maxBytes = 1024 * 1024;
+      const maxBytes = 2 * 1024 * 1024;
       const image = await imageFileToElement(file);
       let maxSide = 1600;
       let blob = null;
@@ -1648,7 +1718,7 @@ if (count($activeTaskSection['tasks']) === 0) {
         maxSide = Math.round(maxSide * 0.82);
       }
 
-      throw new Error('Image could not be reduced below 1 MB');
+      throw new Error('Image could not be reduced below 2 MB');
     }
 
     async function prepareStaffUpload(event) {
