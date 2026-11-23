@@ -1,4 +1,4 @@
-const CACHE_VERSION = "judylink-pwa-v3";
+const CACHE_VERSION = "judylink-pwa-v4";
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg", "/pwa-logo.webp"];
 
@@ -48,6 +48,10 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+  if (url.pathname.startsWith("/backend/")) {
+    event.respondWith(fetch(request));
+    return;
+  }
   if (isCacheableApiRequest(url)) {
     event.respondWith(fetch(request));
     return;

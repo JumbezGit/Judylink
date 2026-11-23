@@ -34,7 +34,7 @@ function admin_header(string $title, string $active): void
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/backend/assets/admin.css?v=1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
@@ -48,31 +48,6 @@ function admin_header(string $title, string $active): void
       document.documentElement.classList.add('sidebar-collapsed-ready');
     }
   </script>
-  <style type="text/tailwindcss">
-    @layer components {
-      .form-control { @apply w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal outline-none transition focus:border-[#2FABE1] focus:ring-4 focus:ring-sky-100; }
-      .secondary { @apply inline-flex items-center justify-center gap-2 rounded-md bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200; }
-      .danger { @apply inline-flex items-center justify-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100; }
-      .primary { @apply inline-flex items-center justify-center gap-2 rounded-md bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 transition hover:bg-sky-100; }
-      .thumb { @apply h-14 w-20 rounded-lg object-cover; }
-      .muted { @apply text-sm text-slate-500; }
-      .admin-card { @apply rounded-lg border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/5; }
-      .admin-table th { @apply border-b border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium uppercase tracking-wide text-slate-500; }
-      .admin-table td { @apply border-b border-slate-100 px-3 py-3 align-top text-sm text-slate-700; }
-      .gallery-card { @apply min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-900/5; }
-      .gallery-card img { @apply aspect-[4/3] h-auto w-full bg-slate-100 object-cover object-center; }
-      .gallery-card-body { @apply grid min-w-0 gap-2 overflow-hidden p-2; }
-      .gallery-card-title { @apply block min-w-0 truncate whitespace-nowrap text-sm font-medium leading-snug text-slate-900; }
-      .gallery-card-meta { @apply block min-w-0 truncate whitespace-nowrap text-xs text-slate-500; }
-      .gallery-actions { @apply flex items-center justify-between gap-2; }
-      .gallery-actions button { @apply grid h-8 w-8 place-items-center px-0 py-0; }
-      .tour-image-badge { @apply absolute rounded-md px-2.5 py-1 text-xs font-medium shadow; }
-      .tour-category-badge { @apply left-3 top-3 bg-white/95 text-[#172033]; }
-      .tour-popular-badge { @apply right-3 top-3 bg-[#FAA723] text-[#172033]; }
-      .side-link.active { @apply bg-sky-500/15 text-white; }
-      .side-link.active .side-icon { @apply bg-[#2FABE1] text-white; }
-    }
-  </style>
   <style>
     body { font-family: 'Poppins', sans-serif; }
     .sidebar-collapsed-ready body .admin-shell { grid-template-columns: 82px minmax(0, 1fr); }

@@ -10,8 +10,6 @@ $result = [
     'ok' => true,
     'php' => PHP_VERSION,
     'database' => [
-        'host' => DB_HOST,
-        'name' => DB_NAME,
         'connected' => false,
     ],
     'tables' => [],
@@ -50,7 +48,9 @@ try {
 } catch (Throwable $exception) {
     http_response_code(500);
     $result['ok'] = false;
-    $result['error'] = $exception->getMessage();
+    $result['error'] = defined('APP_ENV') && APP_ENV === 'production'
+        ? 'Database connection failed'
+        : $exception->getMessage();
 }
 
 echo json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

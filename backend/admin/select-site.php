@@ -40,7 +40,7 @@ $token = admin_token();
   <script>
     if (<?= json_encode($theme) ?> === 'dark') document.documentElement.classList.add('site-dark-ready');
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/backend/assets/admin.css?v=1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     body { font-family: 'Poppins', sans-serif; }

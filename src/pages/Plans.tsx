@@ -154,6 +154,7 @@ function RegistrationSteps({ currentStep }: { currentStep: number }) {
 }
 
 export default function Plans() {
+  const superAdminLoginUrl = import.meta.env.VITE_ADMIN_URL || "/backend/secure-operation-4f2a/";
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedPlanId, setSelectedPlanId] = useState("tours-travel");
   const [agreed, setAgreed] = useState(false);
@@ -348,13 +349,13 @@ export default function Plans() {
               <span className="block text-xs text-[#172033]/45">Systems &amp; registration</span>
             </span>
           </Link>
-          <Link
-            to="/login"
+          <a
+            href={superAdminLoginUrl}
             className="inline-flex items-center gap-2 rounded-xl bg-[#172033] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2FABE1]"
           >
             <LogIn size={17} />
-            <span>Login</span>
-          </Link>
+            <span><span className="hidden sm:inline">Super Admin </span>Login</span>
+          </a>
         </div>
       </header>
       <section className="bg-[#172033] px-4 py-14 text-white sm:px-6 lg:px-8">

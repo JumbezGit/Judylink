@@ -404,7 +404,7 @@ function admin_ensure_settings_table(): void
     $defaults = [
         'brand_name' => 'Judylink',
         'brand_subtitle' => 'Tours & travel control',
-        'brand_logo' => '/src/logo/Hyena%20Tours%20%26%20Travel%20Logo%20S-1-Recovered-clean.webp',
+        'brand_logo' => '/backend/assets/pwa-logo.webp',
     ];
     $stmt = $pdo->prepare('INSERT IGNORE INTO admin_settings (setting_key, setting_value) VALUES (?, ?)');
     foreach ($defaults as $key => $value) {
@@ -606,7 +606,12 @@ function admin_ensure_staff_tables(): void
 function admin_ensure_company_registration_tables(): void
 {
     static $done = false;
+    $schemaVersion = '2026-11-16-admin-pwa-v1';
     if ($done) {
+        return;
+    }
+    if (($_SESSION['judylink_company_schema_version'] ?? '') === $schemaVersion) {
+        $done = true;
         return;
     }
 
@@ -813,6 +818,7 @@ function admin_ensure_company_registration_tables(): void
 
     admin_ensure_site_data_isolation();
 
+    $_SESSION['judylink_company_schema_version'] = $schemaVersion;
     $done = true;
 }
 
@@ -905,6 +911,22 @@ function admin_login_site_by_slug(string $siteSlug): ?array
     return is_array($site) ? $site : null;
 }
 
+function admin_site_home_url(string $configuredUrl = ''): string
+{
+    $fallback = 'https://judylink.zanexcellent.com/';
+    $configuredUrl = trim($configuredUrl);
+    if ($configuredUrl === '') {
+        return $fallback;
+    }
+    if (!preg_match('#^https?://#i', $configuredUrl)) {
+        $configuredUrl = 'https://' . $configuredUrl;
+    }
+    $scheme = strtolower((string) parse_url($configuredUrl, PHP_URL_SCHEME));
+    return filter_var($configuredUrl, FILTER_VALIDATE_URL) && in_array($scheme, ['http', 'https'], true)
+        ? $configuredUrl
+        : $fallback;
+}
+
 function admin_login(string $username, string $password, ?int $requiredSiteId = null): bool
 {
     $user = admin_user_by_username($username);
@@ -941,8 +963,19 @@ function admin_login(string $username, string $password, ?int $requiredSiteId = 
 
 function admin_logout(): never
 {
+    $loginUrl = admin_url();
+    $siteId = admin_selected_site_id();
+    if ($siteId > 0) {
+        admin_ensure_company_registration_tables();
+        $stmt = Database::pdo()->prepare('SELECT site_slug FROM company_sites WHERE id = ? LIMIT 1');
+        $stmt->execute([$siteId]);
+        $siteSlug = trim((string) ($stmt->fetchColumn() ?: ''));
+        if ($siteSlug !== '') {
+            $loginUrl .= '?site=' . rawurlencode($siteSlug);
+        }
+    }
     admin_clear_session();
-    header('Location: ' . admin_url());
+    header('Location: ' . $loginUrl);
     exit;
 }
 

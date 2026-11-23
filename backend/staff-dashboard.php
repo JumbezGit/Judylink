@@ -603,7 +603,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $_SESSION['hyena_admin_selected_site_id'] = (int) $staff['site_id'];
 $brandName = admin_setting('brand_name', 'Judylink');
 $brandSubtitle = admin_setting('brand_subtitle', 'Tours & travel control');
-$logoUrl = admin_setting('brand_logo', '/src/logo/Hyena%20Tours%20%26%20Travel%20Logo%20S-1-Recovered-clean.webp');
+$logoUrl = admin_setting('brand_logo', '/backend/assets/pwa-logo.webp');
 $staffName = trim((string) $staff['first_name'] . ' ' . (string) $staff['second_name'] . ' ' . (string) $staff['third_name']);
 $staffRole = str_replace('_', ' ', (string) $staff['staff_type']);
 $canAccessStaffUploads = (string) $staff['staff_type'] !== 'driver';

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js --host 0.0.0.0",
     "build": "node ./node_modules/vite/bin/vite.js build",
+    "build:admin-css": "node ./node_modules/vite/bin/vite.js build --config vite.admin.config.ts",
+    "build:cpanel": "npm run build && npm run build:admin-css && node scripts/build-cpanel.mjs",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "format": "node ./node_modules/oxfmt/bin/oxfmt"
   },

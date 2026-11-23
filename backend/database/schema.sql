@@ -1,8 +1,6 @@
-CREATE DATABASE IF NOT EXISTS zanexcel_db
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE zanexcel_db;
+-- Import this file after selecting the database created in cPanel/phpMyAdmin.
+-- Database creation is intentionally omitted because shared hosts normally do
+-- not grant CREATE DATABASE permission to application users.
 
 CREATE TABLE IF NOT EXISTS admin_users (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -27,7 +25,7 @@ CREATE TABLE IF NOT EXISTS admin_settings (
 INSERT IGNORE INTO admin_settings (setting_key, setting_value) VALUES
   ('brand_name', 'Judylink'),
   ('brand_subtitle', 'Tours & travel control'),
-  ('brand_logo', '/src/logo/Hyena%20Tours%20%26%20Travel%20Logo%20S-1-Recovered-clean.webp');
+  ('brand_logo', '/backend/assets/pwa-logo.webp');
 
 CREATE TABLE IF NOT EXISTS admin_navigation (
   nav_key VARCHAR(40) NOT NULL PRIMARY KEY,

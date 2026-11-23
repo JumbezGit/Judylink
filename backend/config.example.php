@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+const APP_ENV = 'development';
+
 const DB_HOST = '127.0.0.1';
 const DB_NAME = 'hyena_tour_travel';
 const DB_USER = 'root';
@@ -25,6 +27,8 @@ const SCAYPAY_CALLBACK_URL = APP_URL . '/plans';
 const UPLOAD_ROOT = __DIR__ . '/uploads';
 const PUBLIC_UPLOAD_BASE = '/backend/uploads';
 const IMAGE_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+const IMAGE_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
+const IMAGE_MAX_SOURCE_PIXELS = 64_000_000;
 const IMAGE_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 const IMAGE_MAX_SOURCE_PIXELS = 64_000_000;
 const IMAGE_MAX_WIDTH = 1600;

@@ -30,7 +30,7 @@ if (!empty($_SESSION['staff_user_id'])) {
 
 $error = '';
 $brandName = admin_setting('brand_name', 'Judylink');
-$logoUrl = admin_setting('brand_logo', '/src/logo/Hyena%20Tours%20%26%20Travel%20Logo%20S-1-Recovered-clean.webp');
+$logoUrl = admin_setting('brand_logo', '/backend/assets/pwa-logo.webp');
 $homeUrl = rtrim(APP_URL, '/');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
