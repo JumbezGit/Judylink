@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/zanexcel/judylink.zanexcellent.com
+    - /bin/test -f "$DEPLOYPATH/backend/config.php"
+    - /bin/mkdir -p "$DEPLOYPATH"
+    - npm ci --no-audit --no-fund
+    - npm run build:cpanel
+    - /bin/cp -a deploy/cpanel-package/public_html/. "$DEPLOYPATH/"
+
