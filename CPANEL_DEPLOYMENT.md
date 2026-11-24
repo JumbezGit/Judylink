@@ -22,9 +22,10 @@ from Git and from the generated deployment package. Before the first deployment:
 4. Set `APP_URL` to `https://judylink.zanexcellent.com`.
 5. Keep the file permissions restricted to the cPanel account.
 
-The deployment checks that this file exists before publishing. Deployments copy
-new application files over the existing document root, so `backend/config.php`
-and existing files under `backend/uploads/` are preserved.
+Deployments copy new application files over the existing document root, so
+`backend/config.php` and existing files under `backend/uploads/` are preserved.
+The frontend is still published when the private configuration has not been
+created, but backend URLs will return HTTP 500 until it is present and valid.
 
 ## cPanel setup
 
@@ -40,4 +41,3 @@ and existing files under `backend/uploads/` are preserved.
 
 If cPanel reports that `npm` is unavailable, configure the repository's deploy
 task to use the absolute `npm` path provided by the cPanel Node.js application.
-
